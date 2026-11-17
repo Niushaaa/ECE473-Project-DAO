@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Class DAO</title>
+<style>
+:root {
+  /* Layout: one narrow column, top bar with wallet, tab row, cards. Minimal: one accent, hairline borders. */
+  --bg: #ffffff;
+  --panel: #f6f7f9;
+  --ink: #111318;
+  --muted: #6b7180;
+  --line: #e3e5ea;
+  --accent: #3451d1;
+  --accent-ink: #ffffff;
+  --good: #1b8a52;
+  --bad: #c43c2a;
+  --gold: #c98f00;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0e1015; --panel: #171a21; --ink: #e9ebf0; --muted: #8d93a3; --line: #272b35; --accent: #7f95ff; --accent-ink: #0e1015; --good: #4cc48a; --bad: #f07d6a; --gold: #f0bb3a; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font); }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 880px; margin: 0 auto; padding: 0 16px 80px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0 10px; flex-wrap: wrap; }
+.brand { font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+.brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.status { font-size: 0.85rem; color: var(--muted); }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--line); white-space: nowrap; }
+.pill.on { color: var(--good); border-color: currentColor; }
+.pill.off { color: var(--muted); }
+.pill.warn { color: var(--bad); border-color: currentColor; }
+nav { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 22px; overflow-x: auto; }
+nav button { background: none; border: 0; padding: 10px 14px; color: var(--muted); font-weight: 600; font-size: 0.92rem; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+nav button.admin { margin-left: auto; }
+[hidden] { display: none !important; }
+.tab { display: none; flex-direction: column; gap: 16px; }
+.tab.active { display: flex; }
+.card { border: 1px solid var(--line); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.card h2 { margin: 0; font-size: 1rem; }
+.card h2 small { font-weight: 400; color: var(--muted); margin-left: 6px; }
+.muted { color: var(--muted); }
+.small { font-size: 0.85rem; }
+.mono { font-family: var(--mono); font-size: 0.85rem; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.btn { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); border-radius: 8px; padding: 9px 16px; font-weight: 600; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+.btn.sm { padding: 4px 10px; font-size: 0.85rem; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+input[type="text"], input[type="number"], select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; width: 100%; }
+textarea { min-height: 84px; resize: vertical; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+.big { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.stat { background: var(--panel); border-radius: 10px; padding: 12px 14px; }
+.stat .muted { font-size: 0.8rem; }
+.check { display: flex; align-items: center; gap: 10px; }
+.check .b { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--line); display: grid; place-items: center; font-size: 0.75rem; flex-shrink: 0; }
+.check.ok .b { background: var(--good); border-color: var(--good); color: #fff; }
+.alloc-row { display: grid; grid-template-columns: 76px 1fr 44px 92px; gap: 12px; align-items: center; }
+.alloc-row .t { font-weight: 600; }
+.alloc-row .n { font-family: var(--mono); text-align: right; }
+.alloc-row .v { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); text-align: right; }
+.rank { display: grid; grid-template-columns: 28px 84px 1fr 70px; gap: 12px; align-items: center; padding: 6px 0; }
+.rank .pos { font-family: var(--mono); color: var(--muted); }
+.rank .bar { height: 14px; border-radius: 7px; background: var(--panel); overflow: hidden; }
+.rank .bar i { display: block; height: 100%; background: var(--accent); border-radius: 7px; transition: width .4s; }
+.rank.first .bar i { background: var(--gold); }
+.rank .val { font-family: var(--mono); text-align: right; font-weight: 600; }
+.rank .sub { grid-column: 3 / -1; font-size: 0.78rem; color: var(--muted); margin-top: -6px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; }
+td.c, th.c { text-align: center; }
+.scroll { overflow-x: auto; max-height: 460px; overflow-y: auto; }
+.qlist { display: flex; flex-direction: column; gap: 8px; }
+.q { background: var(--panel); border-radius: 8px; padding: 10px 12px; font-size: 0.92rem; }
+.q b { font-size: 0.78rem; color: var(--muted); display: block; }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 0.9rem; max-width: min(560px, 92vw); box-shadow: 0 6px 24px rgba(0,0,0,.2); z-index: 50; display: none; }
+.toast.err { background: var(--bad); color: #fff; }
+.overlay { position: fixed; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; z-index: 40; text-align: center; padding: 20px; }
+.overlay.show { display: flex; }
+.overlay .code { font-family: var(--mono); font-size: clamp(3rem, 14vw, 9rem); font-weight: 700; letter-spacing: 0.08em; }
+.empty { color: var(--muted); padding: 10px 0; }
+details summary { cursor: pointer; font-weight: 600; }
+.sep { height: 1px; background: var(--line); }
+@media (max-width: 560px) {
+  .alloc-row { grid-template-columns: 64px 1fr 32px; }
+  .alloc-row .v { grid-column: 2 / -1; text-align: left; margin-top: -8px; }
+  .rank { grid-template-columns: 22px 64px 1fr 56px; gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span class="dot"></span>Class DAO <span class="status" id="sessionPill"></span></div>
+    <div class="row">
+      <span class="small muted" id="walletInfo"></span>
+      <button class="btn" id="connectBtn" type="button">Connect wallet</button>
+    </div>
+  </header>
+
+  <!-- GATE: shown until a wallet is connected -->
+  <section class="card" id="gate">
+    <h2>Connect your wallet to continue</h2>
+    <p class="small muted" style="margin:0" id="gateText">Use MetaMask on the Sepolia test network. No MetaMask yet? <a href="https://metamask.io/download/" target="_blank" rel="noopener">Install it</a>, create a wallet, then come back here. On a phone, open this site inside the MetaMask app's browser.</p>
+    <div><button class="btn" id="gateConnect" type="button">Connect wallet</button></div>
+  </section>
+
+  <div id="app" hidden>
+  <nav role="tablist" id="tabs">
+    <button type="button" role="tab" data-tab="checkin" aria-selected="true">Check in</button>
+    <button type="button" role="tab" data-tab="vote" aria-selected="false">Vote</button>
+    <button type="button" role="tab" data-tab="live" aria-selected="false">Live leaderboard</button>
+    <button type="button" role="tab" data-tab="me" aria-selected="false">My progress</button>
+    <button type="button" role="tab" data-tab="admin" aria-selected="false" class="admin" hidden>Admin</button>
+  </nav>
+
+  <!-- CHECK IN -->
+  <section class="tab active" id="tab-checkin">
+    <div class="card" id="checkinCard"></div>
+  </section>
+
+  <!-- VOTE -->
+  <section class="tab" id="tab-vote">
+    <div class="card" id="checklistCard"></div>
+    <div class="card" id="questionCard"></div>
+    <div class="card" id="voteCard"></div>
+  </section>
+
+  <!-- LIVE -->
+  <section class="tab" id="tab-live">
+    <div class="card"><div class="row"><h2 class="grow">Top 10 <small>all sessions so far</small></h2><span class="small muted" id="liveUpdated"></span></div><div id="semesterRanks"></div></div>
+  </section>
+
+  <!-- ME -->
+  <section class="tab" id="tab-me">
+    <div class="card" id="meCard"></div>
+    <div class="card" id="teamQCard" hidden></div>
+  </section>
+
+  <!-- ADMIN -->
+  <section class="tab" id="tab-admin">
+    <div class="card" id="adminSession"></div>
+    <div class="card" id="adminExport"></div>
+  </section>
+  </div>
+</div>
+
+<div class="overlay" id="codeOverlay" role="dialog" aria-label="Check-in code">
+  <div class="muted">Check in at this site with code</div>
+  <div class="code" id="overlayCode"></div>
+  <div class="muted" id="overlayUrl"></div>
+  <button class="btn ghost" type="button" id="overlayClose">Close</button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<script>
+/* ======================================================================
+   CONFIG: paste your deployed contract address here.
+   Any value can be overridden in the URL: ?contract=0x...&rpc=...&chainId=...
+   ====================================================================== */
+const CONFIG = {
+  contract: "0x0000000000000000000000000000000000000000",
+  rpc: "https://ethereum-sepolia-rpc.publicnode.com",
+  chainId: 11155111,
+  chainName: "Sepolia",
+  explorer: "https://sepolia.etherscan.io",
+  refreshMs: 8000,
+  // Display only: the TA starts and ends each session from the Admin tab.
+  sessionDates: ["Tue Nov 17", "Thu Nov 19", "Tue Nov 24", "Tue Dec 1", "Thu Dec 3"],
+  sessionHours: "12:00–3:00pm",
+};
+(function applyUrlOverrides() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("contract")) CONFIG.contract = q.get("contract");
+  if (q.get("rpc")) CONFIG.rpc = q.get("rpc");
+  if (q.get("chainId")) CONFIG.chainId = Number(q.get("chainId"));
+})();
+
+const ABI = [
+  "function owner() view returns (address)",
+  "function balanceOf(address) view returns (uint256)",
+  "function currentSession() view returns (uint8)",
+  "function teamOf(address) view returns (uint8)",
+  "function checkedIn(uint8,address) view returns (bool)",
+  "function getSession(uint8) view returns (bool started, bool checkInOpen, bool live, bool ended, uint8[] teams, uint256 attendeeCount)",
+  "function getAttendees(uint8) view returns (address[])",
+  "function getResults(uint8) view returns (uint8[] teams, uint256[] tokens, uint256[] votesX1000, uint256[] voters)",
+  "function getQuestions(uint8) view returns (address[] askers, uint8[] teams, string[] texts)",
+  "function getAlloc(uint8,address) view returns (uint8[] teams, uint256[] tokens)",
+  "function getStudent(address) view returns (uint8 team, string netId, bool[5] attended, bool[5] valid, uint256[5] asked, uint256 balance)",
+  "function getStudents() view returns (address[] addrs, uint8[] teams, string[] netIds)",
+  "function register(uint8 team, string netId)",
+  "function checkIn(uint8 s, string code)",
+  "function allocate(uint8 s, uint8[] teams, uint256[] amounts)",
+  "function ask(uint8 s, uint8 team, string text)",
+  "function startSession(uint8 s, uint8[] teams, bytes32 hash)",
+  "function endSession(uint8 s)",
+  "function setCheckIn(uint8 s, bool open, bytes32 newHash)",
+  "function checkInFor(uint8 s, address[] addrs)",
+  "function setStudent(address a, uint8 team, string netId)",
+];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const short = (a) => a ? a.slice(0, 6) + "…" + a.slice(-4) : "";
+const fmtVotes = (x1000) => (Number(x1000) / 1000).toFixed(2);
+const normCode = (c) => c.trim().toUpperCase();
+const normNetId = (x) => x.trim().toLowerCase();
+const isNetId = (x) => /^[a-z][a-z0-9]{1,15}$/.test(x);
+const N = Number;
+const winLabel = (i) => `${CONFIG.sessionDates[i] || "Session " + (i + 1)}, ${CONFIG.sessionHours}`;
+const pl = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+const state = {
+  read: null, signer: null, write: null, me: null, owner: null,
+  s: 0, session: null, myAlloc: null, myStudent: null, questions: null,
+  tab: "checkin", busy: false,
+};
+
+// ---------------------------------------------------------------- utils
+let toastT;
+function toast(msg, err) {
+  const t = $("toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.style.display = "block";
+  clearTimeout(toastT); toastT = setTimeout(() => (t.style.display = "none"), err ? 7000 : 3500);
+}
+function errMsg(e) {
+  const m = e?.reason || e?.info?.error?.message || e?.error?.message || e?.shortMessage || e?.message || String(e);
+  return m.replace(/^execution reverted:?\s*/i, "").replace(/^VM Exception while processing transaction: revert\s*/i, "");
+}
+async function send(label, fn) {
+  if (state.busy) return;
+  state.busy = true; document.body.style.cursor = "progress";
+  try {
+    toast(label + ": confirm in your wallet…");
+    const tx = await fn();
+    toast(label + ": waiting for the network…");
+    await tx.wait();
+    toast(label + ": done");
+    await refresh();
+    return true;
+  } catch (e) {
+    if (e?.code === "ACTION_REJECTED" || e?.code === 4001) toast("Cancelled in wallet", true);
+    else toast(errMsg(e), true);
+    return false;
+  } finally { state.busy = false; document.body.style.cursor = ""; }
+}
+function download(name, text) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+const csv = (rows) => rows.map((r) => r.map((v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n");
+const isAdmin = () => state.me && state.owner && state.me.toLowerCase() === state.owner.toLowerCase();
+
+// ---------------------------------------------------------------- wallet
+async function connect() {
+  if (!window.ethereum) { toast("No wallet found. Install MetaMask, then reload this page.", true); return; }
+  try {
+    await window.ethereum.request({ method: "eth_requestAccounts" });
+    await ensureChain();
+    const bp = new ethers.BrowserProvider(window.ethereum);
+    state.signer = await bp.getSigner();
+    state.me = await state.signer.getAddress();
+    state.write = new ethers.Contract(CONFIG.contract, ABI, state.signer);
+    await refresh();
+  } catch (e) { toast(errMsg(e), true); }
+}
+async function ensureChain() {
+  const hex = "0x" + CONFIG.chainId.toString(16);
+  const cur = await window.ethereum.request({ method: "eth_chainId" });
+  if (cur?.toLowerCase() === hex) return;
+  try {
+    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hex }] });
+  } catch (e) {
+    if (e?.code === 4902) {
+      await window.ethereum.request({ method: "wallet_addEthereumChain", params: [{ chainId: hex, chainName: CONFIG.chainName, rpcUrls: [CONFIG.rpc], nativeCurrency: { name: "Sepolia ETH", symbol: "ETH", decimals: 18 }, blockExplorerUrls: [CONFIG.explorer] }] });
+    } else throw e;
+  }
+}
+async function addTokenToWallet() {
+  try {
+    await window.ethereum.request({ method: "wallet_watchAsset", params: { type: "ERC20", options: { address: CONFIG.contract, symbol: "CDAO", decimals: 0 } } });
+  } catch (e) { toast(errMsg(e), true); }
+}
+
+// ---------------------------------------------------------------- data
+async function refresh() {
+  const c = state.read;
+  try {
+    if (!state.owner) state.owner = await c.owner();
+    state.s = N(await c.currentSession());
+    state.sessAll = await Promise.all([1, 2, 3, 4, 5].map(async (k) => {
+      const r = await c.getSession(k);
+      return { started: r.started, checkInOpen: r.checkInOpen, live: r.live, ended: r.ended, teams: r.teams.map(N), attendees: N(r.attendeeCount) };
+    }));
+    const nextIdx = state.sessAll.findIndex((x) => !x.started);
+    state.focus = state.s || (nextIdx >= 0 ? nextIdx + 1 : 0);
+    state.session = state.focus ? state.sessAll[state.focus - 1] : null;
+    if (state.me) {
+      const st = await c.getStudent(state.me);
+      state.myStudent = { team: N(st.team), netId: st.netId, attended: [...st.attended], valid: [...st.valid], asked: st.asked.map(N), balance: N(st.balance) };
+      state.myChecked = state.s ? state.myStudent.attended[state.s - 1] : false;
+      if (state.s) {
+        const al = await c.getAlloc(state.s, state.me);
+        state.myAlloc = Object.fromEntries(al.teams.map((t, i) => [N(t), N(al.tokens[i])]));
+        const q = await c.getQuestions(state.s);
+        state.myQuestions = q.askers.map((a, i) => ({ a, t: N(q.teams[i]), text: q.texts[i] })).filter((x) => x.a.toLowerCase() === state.me.toLowerCase());
+      } else { state.myAlloc = {}; state.myQuestions = []; }
+    }
+    renderHeader();
+    renderTab();
+  } catch (e) {
+    $("sessionPill").innerHTML = '<span class="pill warn">Cannot reach the contract</span>';
+    console.error(e);
+  }
+}
+function nextText() {
+  if (!state.focus) return "All five sessions are over.";
+  return `Next: Session ${state.focus}, ${winLabel(state.focus - 1)}.`;
+}
+function sessPill(x) {
+  return x.live ? (x.checkInOpen ? '<span class="pill on">Live · collecting tokens</span>' : '<span class="pill on">Live</span>') : x.ended ? '<span class="pill off">Ended</span>' : '<span class="pill off">Not started</span>';
+}
+
+// ---------------------------------------------------------------- render: header + tabs
+function renderHeader() {
+  const S = state.session;
+  let pill = '<span class="pill off">All sessions done</span>';
+  if (state.s) pill = `<span class="pill on">Session ${state.s} · live</span>`;
+  else if (state.focus) pill = `<span class="pill off">No session live · next: Session ${state.focus}</span>`;
+  $("sessionPill").innerHTML = pill;
+  if (state.me) {
+    const st = state.myStudent;
+    $("walletInfo").innerHTML = `<span class="mono">${short(state.me)}</span>` + (st?.team ? ` · ${esc(st.netId)} · Team ${st.team}` : "") + (st ? ` · <b>${st.balance}</b> tokens` : "") + (isAdmin() ? " · TA" : "");
+    $("connectBtn").hidden = true;
+  }
+  // Nothing is shown until a wallet is connected; the Admin tab only for the contract owner.
+  $("gate").hidden = !!state.me;
+  $("app").hidden = !state.me;
+  document.querySelector('nav button[data-tab="admin"]').hidden = !isAdmin();
+  if (state.tab === "admin" && !isAdmin()) setTab("checkin");
+}
+function setTab(t) {
+  state.tab = t;
+  document.querySelectorAll("nav button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === t));
+  document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("active", s.id === "tab-" + t));
+  try { history.replaceState(null, "", location.pathname + location.search + "#" + t); } catch {}
+  renderTab();
+}
+function renderTab() {
+  ({ checkin: renderCheckin, vote: renderVote, live: renderLive, me: renderMe, admin: renderAdmin })[state.tab]?.();
+}
+
+// ---------------------------------------------------------------- check in
+// Re-render a card only when its underlying data changed, so typed text survives the auto-refresh.
+const lastKey = {};
+function changed(name, key) { if (lastKey[name] === key) return false; lastKey[name] = key; return true; }
+function renderCheckin() {
+  const el = $("checkinCard"), S = state.session, st = state.myStudent;
+  if (!changed("checkin", JSON.stringify([state.me, st, S, state.s, state.focus, state.myChecked]))) return;
+  if (!state.me) { el.innerHTML = `<h2>Connect your wallet to check in</h2><div><button class="btn" type="button" onclick="connect()">Connect wallet</button></div>`; return; }
+  if (!st?.team) {
+    el.innerHTML = `<h2>Register <small>once for the whole course</small></h2>
+      <div class="row">
+        <label class="f" style="width:120px">Team #<input type="number" id="regTeam" min="1" max="50" placeholder="e.g. 7"></label>
+        <label class="f grow">NetID<input type="text" id="regNetId" class="mono" placeholder="e.g. xy1234" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+        <button class="btn" type="button" id="regBtn" style="align-self:flex-end">Register</button>
+      </div>
+      <p class="small muted" style="margin:0">Your NetID is used for grading. Check it carefully.</p>
+      <div class="sep"></div>
+      <p class="small muted" style="margin:0">Registering needs a little Sepolia test ETH for the fee. Your address, for faucets:</p>
+      <div class="row"><span class="mono grow" style="overflow-wrap:anywhere">${state.me}</span><button class="btn ghost sm" type="button" id="copyAddr">Copy</button></div>`;
+    $("copyAddr").onclick = () => navigator.clipboard.writeText(state.me).then(() => toast("Address copied"), () => toast("Copy failed: select it manually", true));
+    $("regBtn").onclick = () => {
+      const t = N($("regTeam").value), id = normNetId($("regNetId").value);
+      if (!(t >= 1 && t <= 50)) return toast("Enter a team number 1-50", true);
+      if (!isNetId(id)) return toast("Enter your NetID, e.g. xy1234", true);
+      send("Register", () => state.write.register(t, id));
+    };
+    return;
+  }
+  if (!state.s) { el.innerHTML = `<h2>No session is live right now</h2><p class="muted small" style="margin:0">${nextText()} Check-in opens when the TA starts the session. This page updates by itself.</p>`; return; }
+  if (state.myChecked) {
+    el.innerHTML = `<h2>Checked in to Session ${state.s}</h2>
+      <div class="stats"><div class="stat"><div class="muted">Your tokens</div><div class="big">${st.balance}</div></div>
+      <div class="stat"><div class="muted">Tokens expire</div><div style="font-weight:600;margin-top:6px">When the TA ends the session</div></div></div>
+      <div class="row"><button class="btn" type="button" onclick="setTab('vote')">Go vote</button><button class="btn ghost" type="button" onclick="addTokenToWallet()">Show CDAO in MetaMask</button></div>`;
+    return;
+  }
+  if (!S.checkInOpen) { el.innerHTML = `<h2>Token collection is closed for Session ${state.s}</h2><p class="muted small" style="margin:0">If you're in the room, ask the TA to check you in.</p>`; return; }
+  el.innerHTML = `<h2>Check in to Session ${state.s} <small>you get 10 tokens</small></h2>
+    <div class="row"><input type="text" id="codeIn" placeholder="Code shown in class" autocomplete="off" class="grow mono" style="text-transform:uppercase;flex:1;min-width:180px"><button class="btn" type="button" id="checkBtn">Check in</button></div>`;
+  const go = () => { const c = normCode($("codeIn").value); if (!c) return toast("Enter the code", true); send("Check in", () => state.write.checkIn(state.s, c)); };
+  $("checkBtn").onclick = go;
+  $("codeIn").onkeydown = (e) => { if (e.key === "Enter") go(); };
+}
+
+// ---------------------------------------------------------------- vote
+let pending = {};
+function renderVote(force) {
+  const vc = $("voteCard"), qc = $("questionCard"), cc = $("checklistCard"), S = state.session, st = state.myStudent;
+  if (!changed("vote", JSON.stringify([state.me, st, S, state.s, state.myChecked, state.myAlloc, state.myQuestions])) && !force) return;
+  const gate = (msg) => { vc.innerHTML = `<h2>${msg}</h2>`; qc.style.display = "none"; cc.style.display = "none"; };
+  if (!state.me) return gate('Connect your wallet to vote');
+  if (!state.s || !S?.live) { gate("No session is live"); vc.innerHTML += `<p class="muted small" style="margin:0">${nextText()}</p>`; return; }
+  if (!state.myChecked) { gate("Check in first"); vc.innerHTML += `<div><button class="btn" type="button" onclick="setTab('checkin')">Go to check-in</button></div>`; return; }
+  qc.style.display = ""; cc.style.display = "";
+  const teams = S.teams.filter((t) => t !== st.team);
+  const given = state.myAlloc || {};
+  const covered = teams.filter((t) => given[t] > 0).length;
+  const nq = state.myQuestions?.length || 0;
+
+  // keep pending within limits
+  for (const t of Object.keys(pending)) if (!teams.includes(N(t))) delete pending[t];
+  const pendSum = () => teams.reduce((s, t) => s + (pending[t] || 0), 0);
+
+  cc.innerHTML = `<div class="check ${nq >= 1 ? "ok" : ""}"><span class="b">✓</span>First question asked</div>
+    <div class="check ${nq >= 2 ? "ok" : ""}"><span class="b">✓</span>Second question asked</div>
+    <div class="check ${covered === teams.length ? "ok" : ""}"><span class="b">✓</span>Tokens sent</div>`;
+
+  vc.innerHTML = `<h2>Give tokens</h2>
+    <div class="row"><span class="grow small muted">Tokens left</span><span class="big" id="left"></span></div>
+    <div id="allocRows" style="display:grid;gap:12px"></div>
+    <div class="row"><span class="grow small muted">Tokens expire when the session ends.</span><button class="btn" type="button" id="allocBtn">Send tokens</button></div>
+    <p class="small" style="margin:0;color:var(--bad)">⚠ All your tokens are sent at once and can't be taken back. Send them at the end of the session, after every team has presented.</p>`;
+  const rows = $("allocRows");
+  rows.innerHTML = teams.length ? teams.map((t) => `<div class="alloc-row">
+      <span class="t">Team ${t}</span>
+      <input type="range" min="0" max="10" step="1" id="sl${t}" aria-label="Tokens for team ${t}">
+      <span class="n" id="nv${t}"></span>
+      <span class="v" id="vv${t}"></span></div>`).join("") : '<div class="empty">No other teams presenting.</div>';
+  function draw() {
+    const left = st.balance - pendSum();
+    $("left").textContent = left;
+    teams.forEach((t) => {
+      const g = given[t] || 0, p = pending[t] || 0;
+      const sl = $("sl" + t);
+      sl.max = String(Math.max(0, 10 - g)); sl.value = String(p);
+      sl.disabled = g >= 10;
+      $("nv" + t).textContent = g + p;
+      $("vv" + t).textContent = Math.sqrt(g + p).toFixed(2) + " votes" + (g ? ` (${g} sent)` : "");
+    });
+    const b = $("allocBtn"); b.disabled = pendSum() === 0; b.textContent = pendSum() ? `Send ${pendSum()} token${pendSum() > 1 ? "s" : ""}` : "Send tokens";
+  }
+  teams.forEach((t) => {
+    $("sl" + t).oninput = (e) => {
+      let v = N(e.target.value);
+      const others = pendSum() - (pending[t] || 0);
+      v = Math.min(v, st.balance - others);
+      pending[t] = Math.max(0, v); draw();
+    };
+  });
+  $("allocBtn").onclick = async () => {
+    const ts = teams.filter((t) => pending[t] > 0);
+    if (!ts.length) return;
+    const ok = await send("Send tokens", () => state.write.allocate(state.s, ts, ts.map((t) => pending[t])));
+    if (ok) { pending = {}; renderVote(true); }
+  };
+  draw();
+
+  qc.innerHTML = `<h2>Written questions <small>at least 2 this session · sent to the team</small></h2>
+    <div class="row"><select id="qTeam" style="width:160px"><option value="" selected disabled>Choose team…</option>${teams.map((t) => `<option value="${t}">Team ${t}</option>`).join("")}</select></div>
+    <textarea id="qText" maxlength="600" placeholder="Your question for this team"></textarea>
+    <div class="row"><span class="grow small muted" id="qLen">0 / 600</span><button class="btn" type="button" id="qBtn">Submit question</button></div>
+    <div class="qlist">${(state.myQuestions || []).map((q) => `<div class="q"><b>To Team ${q.t}</b>${esc(q.text)}</div>`).join("") || '<div class="empty small">No questions yet.</div>'}</div>`;
+  $("qText").oninput = (e) => ($("qLen").textContent = e.target.value.length + " / 600");
+  $("qBtn").onclick = async () => {
+    const text = $("qText").value.trim(), t = N($("qTeam").value);
+    if (!t) return toast("Choose the team this question is for", true);
+    if (text.length < 5) return toast("Write at least 5 characters", true);
+    const ok = await send("Submit question", () => state.write.ask(state.s, t, text));
+    if (ok) { $("qTeam").value = ""; $("qText").value = ""; $("qLen").textContent = "0 / 600"; }
+  };
+}
+
+// ---------------------------------------------------------------- live
+let liveCache = {};
+async function renderLive() {
+  const c = state.read;
+  try {
+    const all = await Promise.all([1, 2, 3, 4, 5].map((s) => c.getResults(s)));
+    all.forEach((r, i) => {
+      liveCache[i + 1] = { teams: r.teams.map(N), votes: r.votesX1000.map(N), voters: r.voters.map(N) };
+    });
+  } catch (e) { $("liveUpdated").textContent = "Cannot reach the network"; return; }
+  const sem = [];
+  Object.entries(liveCache).forEach(([s, x]) => x.teams.forEach((t, i) => sem.push({ t, v: x.votes[i], sub: `Session ${s} · ${pl(x.voters[i], "voter")}` })));
+  $("semesterRanks").innerHTML = ranks(sem, "No votes yet.", 10);
+  $("liveUpdated").textContent = "Updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+function ranks(items, emptyMsg, limit) {
+  if (!items.length) return `<div class="empty">${emptyMsg}</div>`;
+  items.sort((a, b) => b.v - a.v);
+  if (limit) items = items.slice(0, limit);
+  const max = Math.max(1, ...items.map((x) => x.v));
+  return items.map((x, i) => `<div class="rank ${i === 0 && x.v > 0 ? "first" : ""}"><span class="pos">${i + 1}</span><span style="font-weight:600">Team ${x.t}</span>
+    <span class="bar"><i style="width:${(x.v / max) * 100}%"></i></span><span class="val">${fmtVotes(x.v)}</span><span class="sub">${x.sub}</span></div>`).join("");
+}
+
+// ---------------------------------------------------------------- me
+function renderMe() {
+  const el = $("meCard"), st = state.myStudent;
+  if (!state.me) { el.innerHTML = `<h2>Connect your wallet to see your progress</h2>`; return; }
+  if (!st?.team) { el.innerHTML = `<h2>You're not registered yet</h2><p class="small muted" style="margin:0">See the Check in tab.</p>`; return; }
+  const validN = st.valid.filter(Boolean).length;
+  const full = validN >= 4;
+  el.innerHTML = `<div class="row"><h2 class="grow">Your participation <small>${esc(st.netId)} · Team ${st.team}</small></h2><span class="pill ${full ? "on" : "warn"}">${full ? "Full credit" : "Not complete yet"}</span></div>
+    <div class="stats">
+      <div class="stat"><div class="muted">Valid ballots (need 4 of 5)</div><div class="big">${validN}/5</div></div>
+    </div>
+    <div class="scroll"><table><thead><tr><th>Session</th><th class="c">Checked in</th><th class="c">Written questions</th><th class="c">Valid ballot</th></tr></thead><tbody>
+    ${[0, 1, 2, 3, 4].map((i) => `<tr><td>Session ${i + 1}</td><td class="c">${st.attended[i] ? "✓" : "–"}</td><td class="c">${st.asked[i]}</td><td class="c" style="color:${st.valid[i] ? "var(--good)" : "var(--muted)"}">${st.valid[i] ? "✓" : "–"}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="small muted" style="margin:0">A valid ballot: tokens on every presenting team (except yours) and at least 2 written questions.</p>`;
+  renderTeamQuestions(st.team);
+}
+
+// Written questions other students sent to this student's team, all sessions so far. Anonymous.
+async function renderTeamQuestions(team) {
+  const el = $("teamQCard");
+  if (!state.sessAll) return;
+  const started = [1, 2, 3, 4, 5].filter((s) => state.sessAll[s - 1].started);
+  let list = [];
+  try {
+    const all = await Promise.all(started.map((s) => state.read.getQuestions(s)));
+    all.forEach((q, i) => q.texts.forEach((text, j) => { if (N(q.teams[j]) === team) list.push({ s: started[i], text }); }));
+  } catch (e) { return; }
+  if (!changed("teamQ", JSON.stringify([team, list]))) return;
+  el.hidden = false;
+  el.innerHTML = `<h2>Questions for your team <small>${pl(list.length, "question")} so far · anonymous</small></h2>
+    <div class="qlist">${list.map((q) => `<div class="q"><b>Session ${q.s}</b>${esc(q.text)}</div>`).join("") || '<div class="empty small">No questions yet. They show up here as classmates send them.</div>'}</div>`;
+}
+
+// ---------------------------------------------------------------- admin
+let adminData = null;
+async function loadAdmin() {
+  const c = state.read;
+  const [addrs, teams, netIds] = await c.getStudents();
+  const students = addrs.map((a, i) => ({ a, team: N(teams[i]), netId: netIds[i] }));
+  const netIdOf = Object.fromEntries(students.map((x) => [x.a.toLowerCase(), x.netId]));
+  const byNetId = Object.fromEntries(students.filter((x) => x.netId).map((x) => [x.netId, x.a]));
+  const sess = await Promise.all([1, 2, 3, 4, 5].map(async (s) => { const r = await c.getSession(s); return { started: r.started, checkInOpen: r.checkInOpen, live: r.live, ended: r.ended, teams: r.teams.map(N), att: N(r.attendeeCount) }; }));
+  const attendees = state.s ? await c.getAttendees(state.s) : [];
+  adminData = { students, netIdOf, byNetId, attendees, sess };
+}
+let adminSeq = 0;
+async function renderAdmin() {
+  if (!isAdmin()) return;
+  const my = ++adminSeq;
+  try { await loadAdmin(); } catch (e) { toast("Admin data: " + errMsg(e), true); return; }
+  if (my !== adminSeq) return; // a newer render is on its way
+  renderAdminSession(); renderAdminExport();
+}
+function genCode() {
+  const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s = "";
+  crypto.getRandomValues(new Uint32Array(8)).forEach((x) => (s += A[x % A.length])); return s;
+}
+const codesKey = () => "classdao-codes-" + CONFIG.contract.toLowerCase();
+function getCodes() { try { return JSON.parse(localStorage.getItem(codesKey()) || "{}"); } catch { return {}; } }
+function saveCode(s, code) { const c = getCodes(); c[s] = code; try { localStorage.setItem(codesKey(), JSON.stringify(c)); } catch {} }
+let adminSel = 0, endArmedUntil = 0;
+function renderAdminSession() {
+  const el = $("adminSession"), D = adminData;
+  if (!adminSel) adminSel = state.focus || 5;
+  const codes = getCodes();
+  let html = `<div class="row"><h2 class="grow">Sessions</h2><button class="btn ghost sm" type="button" id="aRefresh">Refresh</button></div>
+    <div class="scroll"><table><thead><tr><th>#</th><th>Planned</th><th>Status</th><th>Teams</th><th class="c">Checked in</th><th></th></tr></thead><tbody>
+    ${D.sess.map((x, i) => `<tr ${adminSel === i + 1 ? 'style="background:var(--panel)"' : ""}><td style="font-weight:600">${i + 1}</td><td>${winLabel(i)}</td><td>${sessPill(x)}</td>
+      <td>${x.started ? x.teams.join(", ") : '<span class="muted">–</span>'}</td><td class="c">${x.att}</td>
+      <td style="text-align:right"><button class="btn ghost sm" type="button" data-sel="${i + 1}">${adminSel === i + 1 ? "Selected" : "Select"}</button></td></tr>`).join("")}
+    </tbody></table></div><div class="sep"></div>`;
+  const s = adminSel, x = D.sess[s - 1];
+  html += `<h2>Session ${s} <small>${winLabel(s - 1)}</small></h2>`;
+  if (x.ended) {
+    html += `<div class="small muted">Ended. ${x.att} students checked in. Results are on the Live tab.</div>`;
+  } else if (!x.started) {
+    if (state.s) html += `<div class="small muted">Session ${state.s} is live. End it before starting session ${s}.</div>`;
+    else html += `<div class="small muted">Starting opens token collection: students who enter the code get 10 tokens and can vote.</div>
+      <div class="row">
+        <label class="f grow">Teams presenting<input type="text" id="oTeams" placeholder="e.g. 3, 7, 12, 18, 21"></label>
+        <label class="f" style="width:200px">Check-in code<input type="text" id="oCode" class="mono" value="${genCode()}" style="text-transform:uppercase"></label>
+      </div>
+      <div class="row"><button class="btn" type="button" id="oStart">Start session ${s}</button><button class="btn ghost" type="button" id="oGen">New code</button></div>`;
+  } else {
+    html += `<div class="stats">
+        <div class="stat"><div class="muted">Checked in</div><div class="big">${x.att}</div></div>
+        <div class="stat"><div class="muted">Token collection</div><div style="font-weight:700;font-size:1.1rem;margin-top:4px;color:${x.checkInOpen ? "var(--good)" : "var(--muted)"}">${x.checkInOpen ? "Open" : "Stopped"}</div></div></div>
+      <div class="small muted">Teams presenting: ${x.teams.join(", ")}</div>
+      <div class="row">
+        <button class="btn ${x.checkInOpen ? "ghost" : ""}" type="button" id="aToggle">${x.checkInOpen ? "Stop token collection" : "Reopen token collection"}</button>
+        <input type="text" id="aNewCode" class="mono" placeholder="New code (optional)" style="width:200px;text-transform:uppercase">
+        <button class="btn ghost" type="button" id="aShow" ${codes[s] ? "" : "disabled"}>Show code</button>
+      </div>
+      <div class="row">
+        <input type="text" id="aManual" class="mono grow" placeholder="Check in manually: NetIDs or addresses, e.g. xy1234, ab5678">
+        <button class="btn ghost" type="button" id="aManualBtn">Check in</button>
+      </div>
+      <div class="sep"></div>
+      <div class="row"><span class="grow small muted">Ending closes voting and questions. Every unspent token expires.</span>
+        <button class="btn danger" type="button" id="aEnd">${Date.now() < endArmedUntil ? "Click again to end" : `End session ${s}`}</button></div>`;
+  }
+  el.innerHTML = html;
+
+  $("aRefresh").onclick = () => refresh();
+  el.querySelectorAll("[data-sel]").forEach((b) => (b.onclick = () => { adminSel = N(b.dataset.sel); renderAdminSession(); }));
+  if ($("oStart")) {
+    $("oGen").onclick = () => ($("oCode").value = genCode());
+    $("oStart").onclick = async () => {
+      const teams = $("oTeams").value.split(/[\s,]+/).filter(Boolean).map(N);
+      if (!teams.length || teams.some((t) => !(t >= 1 && t <= 50))) return toast("List team numbers 1-50", true);
+      const code = normCode($("oCode").value);
+      if (code.length < 6) return toast("Use a code of at least 6 characters", true);
+      const ok = await send("Start session " + s, () => state.write.startSession(s, teams, ethers.id(code)));
+      if (ok) { saveCode(s, code); showCode(code); }
+    };
+  }
+  if ($("aToggle")) {
+    $("aShow").onclick = () => showCode(getCodes()[s]);
+    $("aToggle").onclick = async () => {
+      const nc = normCode($("aNewCode").value);
+      if (nc && nc.length < 6) return toast("Use a code of at least 6 characters", true);
+      const ok = await send(x.checkInOpen ? "Stop collection" : "Reopen collection", () => state.write.setCheckIn(s, !x.checkInOpen, nc ? ethers.id(nc) : ethers.ZeroHash));
+      if (ok && nc) { saveCode(s, nc); if (!x.checkInOpen) showCode(nc); }
+    };
+    $("aManualBtn").onclick = () => {
+      const items = $("aManual").value.split(/[\s,]+/).filter(Boolean);
+      const list = items.map((x) => ethers.isAddress(x) ? x : D.byNetId[normNetId(x)]);
+      const bad = items.filter((x, i) => !list[i]);
+      if (!items.length) return toast("Enter NetIDs or addresses", true);
+      if (bad.length) return toast("Not registered: " + bad.join(", "), true);
+      send("Manual check-in", () => state.write.checkInFor(s, list));
+    };
+    $("aEnd").onclick = (e) => {
+      if (Date.now() > endArmedUntil) {
+        endArmedUntil = Date.now() + 5000; e.target.textContent = "Click again to end";
+        setTimeout(() => { const b = $("aEnd"); if (b && Date.now() > endArmedUntil) b.textContent = `End session ${s}`; }, 5100);
+        return;
+      }
+      endArmedUntil = 0;
+      send("End session " + s, () => state.write.endSession(s)).then((ok) => { if (ok) { adminSel = 0; renderAdmin(); } });
+    };
+  }
+}
+function showCode(code) {
+  if (!code) return toast("No code saved in this browser for this session", true);
+  $("overlayCode").textContent = code;
+  $("overlayUrl").textContent = location.host + location.pathname;
+  $("codeOverlay").classList.add("show");
+}
+
+function renderAdminExport() {
+  const el = $("adminExport");
+  el.innerHTML = `<h2>Exports</h2>
+    <div class="row">
+      <button class="btn ghost" type="button" id="xGrades">Participation grades (CSV)</button>
+      <button class="btn ghost" type="button" id="xTeams">Questions by team, anonymous (CSV)</button>
+      <button class="btn ghost" type="button" id="xAll">All questions with askers (CSV)</button>
+    </div>
+    <p class="small muted" style="margin:0">Contract: <a class="mono" href="${CONFIG.explorer}/address/${CONFIG.contract}" target="_blank" rel="noopener">${short(CONFIG.contract)}</a></p>`;
+  $("xGrades").onclick = exportGrades;
+  $("xTeams").onclick = () => exportQuestions(false);
+  $("xAll").onclick = () => exportQuestions(true);
+}
+async function exportGrades() {
+  toast("Building grades…");
+  const c = state.read, D = adminData;
+  const rows = [["netid", "address", "team", "attended", "valid_ballots", "full_credit", "s1", "s2", "s3", "s4", "s5"]];
+  for (const x of D.students) {
+    const st = await c.getStudent(x.a);
+    const valid = [...st.valid], att = [...st.attended];
+    const vn = valid.filter(Boolean).length;
+    rows.push([st.netId, x.a, N(st.team), att.filter(Boolean).length, vn, vn >= 4 ? "yes" : "no",
+      ...valid.map((v, i) => (v ? "valid" : att[i] ? "attended" : "absent"))]);
+  }
+  download("classdao-participation.csv", csv(rows));
+}
+async function exportQuestions(withAsker) {
+  const c = state.read, rows = [withAsker ? ["session", "team", "asker_netid", "asker_address", "question"] : ["session", "team", "question"]];
+  for (let s = 1; s <= 5; s++) {
+    const q = await c.getQuestions(s);
+    q.texts.forEach((t, i) => rows.push(withAsker ? [s, N(q.teams[i]), adminData.netIdOf[q.askers[i].toLowerCase()] || "", q.askers[i], t] : [s, N(q.teams[i]), t]));
+  }
+  const body = [rows[0], ...rows.slice(1).sort((a, b) => a[1] - b[1] || a[0] - b[0])];
+  download(withAsker ? "classdao-questions-full.csv" : "classdao-questions-by-team.csv", csv(body));
+}
+
+// ---------------------------------------------------------------- boot
+function boot() {
+  if (!window.ethers) { document.body.innerHTML = '<div class="wrap"><p style="padding:40px 0">Could not load ethers.js. Check your connection and reload.</p></div>'; return; }
+  if (!ethers.isAddress(CONFIG.contract) || /^0x0+$/.test(CONFIG.contract)) {
+    $("gate").innerHTML = '<h2>Not configured</h2><p class="small" style="margin:0">Set <span class="mono">CONFIG.contract</span> in index.html to your deployed contract address.</p>';
+    return;
+  }
+  state.read = new ethers.Contract(CONFIG.contract, ABI, new ethers.JsonRpcProvider(CONFIG.rpc, CONFIG.chainId, { staticNetwork: true }));
+  document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => setTab(b.dataset.tab)));
+  $("connectBtn").onclick = connect;
+  $("gateConnect").onclick = connect;
+  $("overlayClose").onclick = () => $("codeOverlay").classList.remove("show");
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("codeOverlay").classList.remove("show"); });
+  if (window.ethereum?.on) {
+    window.ethereum.on("accountsChanged", () => location.reload());
+    window.ethereum.on("chainChanged", () => location.reload());
+  }
+  const h = location.hash.slice(1);
+  if (["checkin", "vote", "live", "me", "admin"].includes(h)) setTab(h);
+  refresh();
+  if (window.ethereum) window.ethereum.request({ method: "eth_accounts" }).then((a) => { if (a?.length) connect(); }).catch(() => {});
+  setInterval(() => {
+    if (state.busy) return;
+    if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && state.tab !== "live") return;
+    if (state.tab === "admin") return; // admin refreshes after each action, not on a timer
+    refresh();
+  }, CONFIG.refreshMs);
+}
+boot();
+</script>
+</body>
+</html>
