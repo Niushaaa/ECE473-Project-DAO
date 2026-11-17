@@ -1,15 +1,16 @@
 # Class DAO: presentation voting on Sepolia
 
+Let's find people's choice for class presentations with some on-chain voting!
+
 Two files:
 
-- `ClassDAO.sol`: the smart contract. It is the CDAO token and also handles registration (team + NetID), sessions, check-in, votes and written questions. The contract itself gives each checked-in student 10 tokens, so you never send tokens yourself.
+- `ClassDAO.sol`: the smart contract. It is the CDAO token and also handles registration, sessions, check-in, votes and written questions.
 - `index.html`: the whole website. Tabs: **Check in**, **Vote**, **Live**, **My progress**, and **Admin** (shown only to the wallet that deployed the contract).
 
-Nothing runs on a server. The contract lives on Sepolia, and the page talks to it from each person's browser.
 
 ---
 
-## One-time setup (about 30 minutes)
+## One-time setup for TA (about 20 minutes)
 
 ### 1. Get your TA wallet ready
 1. Install MetaMask and create (or pick) the wallet you'll use as TA. This wallet becomes the admin.
@@ -37,8 +38,10 @@ const CONFIG = {
 2. Repo **Settings → Pages**: Source = *Deploy from a branch*, Branch = `main` / root. Save.
 3. After about a minute the site is live at `https://<your-username>.github.io/class-dao/`. Post that link on Ed.
 
-### 5. Students register themselves (before session 1)
-1. Each student installs MetaMask, gets a little Sepolia ETH from a faucet (about 0.003 ETH covers the whole course), opens the site and clicks **Connect wallet**.
+## One-time setup for students (about 5 minutes)
+
+### 1. Students register themselves (before session 1)
+1. Each student installs MetaMask, gets a little Sepolia ETH from a faucet, opens the site and clicks **Connect wallet**.
 2. On the Check in tab they enter their **team number** and **NetID** (lowercase, e.g. `xy1234`) and click **Register**. Both are stored on-chain and used for grading. Each NetID can only be registered once.
 3. Mistakes (wrong team, typo in NetID, lost wallet): call `setStudent(address, team, netId)` from the TA wallet in Remix or Etherscan. Giving a NetID to a new wallet removes it from the old one.
 
@@ -70,8 +73,6 @@ Only one session can be live at a time, each session can be started once, and yo
 - **All questions with askers (CSV)**: with each asker's NetID, for your own records.
 
 ## Things to know
-- **Privacy:** wallet addresses, team numbers and **NetIDs** go on a public blockchain, so anyone can link a wallet to a NetID. Written questions are on-chain too, with the asker's address, so tell students not to put personal information in them.
+- **Privacy:** wallet addresses, team numbers and **NetIDs** go on a public blockchain, so anyone can link a wallet to a NetID. Written questions are on-chain too, with the asker's address.
 - **Check-in code:** once a student checks in, the code is visible on the public chain. Stop token collection about 10 minutes in. To rotate the code, enter a new one and click *Stop* / *Reopen token collection*.
-- **Admin access** belongs to the deploying wallet. Back up that wallet's recovery phrase.
-- **Phones:** students on phones should open the site inside the MetaMask app's built-in browser.
 - The contract is set up for 5 sessions and team numbers 1–50.
