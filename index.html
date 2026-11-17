@@ -203,6 +203,7 @@ const ABI = [
   "function getResults(uint8) view returns (uint8[] teams, uint256[] tokens, uint256[] votesX1000, uint256[] voters)",
   "function getQuestions(uint8) view returns (address[] askers, uint8[] teams, string[] texts)",
   "function getAlloc(uint8,address) view returns (uint8[] teams, uint256[] tokens)",
+  "function spent(uint8,address) view returns (uint256)",
   "function getStudent(address) view returns (uint8 team, string netId, bool[5] attended, bool[5] valid, uint256[5] asked, uint256 balance)",
   "function getStudents() view returns (address[] addrs, uint8[] teams, string[] netIds)",
   "function register(uint8 team, string netId)",
@@ -266,6 +267,12 @@ function download(name, text) {
   a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
 const csv = (rows) => rows.map((r) => r.map((v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(",")).join("\n");
+// Valid ballot (decided by the site, not the contract's stricter ballotValid):
+// checked in + at least 2 written questions + at least 1 token sent, to any teams.
+async function validBallots(c, a, st) {
+  const att = [...st.attended], asked = st.asked.map(N);
+  return Promise.all(att.map(async (x, i) => x && asked[i] >= 2 && N(await c.spent(i + 1, a)) > 0));
+}
 const isAdmin = () => state.me && state.owner && state.me.toLowerCase() === state.owner.toLowerCase();
 
 // ---------------------------------------------------------------- wallet
@@ -314,7 +321,7 @@ async function refresh() {
     state.session = state.focus ? state.sessAll[state.focus - 1] : null;
     if (state.me) {
       const st = await c.getStudent(state.me);
-      state.myStudent = { team: N(st.team), netId: st.netId, attended: [...st.attended], valid: [...st.valid], asked: st.asked.map(N), balance: N(st.balance) };
+      state.myStudent = { team: N(st.team), netId: st.netId, attended: [...st.attended], valid: await validBallots(c, state.me, st), asked: st.asked.map(N), balance: N(st.balance) };
       state.myChecked = state.s ? state.myStudent.attended[state.s - 1] : false;
       if (state.s) {
         const al = await c.getAlloc(state.s, state.me);
@@ -423,7 +430,7 @@ function renderVote(force) {
   qc.style.display = ""; cc.style.display = "";
   const teams = S.teams.filter((t) => t !== st.team);
   const given = state.myAlloc || {};
-  const covered = teams.filter((t) => given[t] > 0).length;
+  const sentAny = teams.some((t) => given[t] > 0);
   const nq = state.myQuestions?.length || 0;
 
   // keep pending within limits
@@ -432,7 +439,7 @@ function renderVote(force) {
 
   cc.innerHTML = `<div class="check ${nq >= 1 ? "ok" : ""}"><span class="b">✓</span>First question asked</div>
     <div class="check ${nq >= 2 ? "ok" : ""}"><span class="b">✓</span>Second question asked</div>
-    <div class="check ${covered === teams.length ? "ok" : ""}"><span class="b">✓</span>Tokens sent</div>`;
+    <div class="check ${sentAny ? "ok" : ""}"><span class="b">✓</span>Tokens sent</div>`;
 
   vc.innerHTML = `<h2>Give tokens</h2>
     <div class="row"><span class="grow small muted">Tokens left</span><span class="big" id="left"></span></div>
@@ -527,7 +534,7 @@ function renderMe() {
     <div class="scroll"><table><thead><tr><th>Session</th><th class="c">Checked in</th><th class="c">Written questions</th><th class="c">Valid ballot</th></tr></thead><tbody>
     ${[0, 1, 2, 3, 4].map((i) => `<tr><td>Session ${i + 1}</td><td class="c">${st.attended[i] ? "✓" : "–"}</td><td class="c">${st.asked[i]}</td><td class="c" style="color:${st.valid[i] ? "var(--good)" : "var(--muted)"}">${st.valid[i] ? "✓" : "–"}</td></tr>`).join("")}
     </tbody></table></div>
-    <p class="small muted" style="margin:0">A valid ballot: tokens on every presenting team (except yours) and at least 2 written questions.</p>`;
+    <p class="small muted" style="margin:0">A valid ballot: checked in, tokens sent (to any teams) and at least 2 written questions.</p>`;
   renderTeamQuestions(st.team);
 }
 
@@ -683,7 +690,7 @@ async function exportGrades() {
   const rows = [["netid", "address", "team", "attended", "valid_ballots", "full_credit", "s1", "s2", "s3", "s4", "s5"]];
   for (const x of D.students) {
     const st = await c.getStudent(x.a);
-    const valid = [...st.valid], att = [...st.attended];
+    const valid = await validBallots(c, x.a, st), att = [...st.attended];
     const vn = valid.filter(Boolean).length;
     rows.push([st.netId, x.a, N(st.team), att.filter(Boolean).length, vn, vn >= 4 ? "yes" : "no",
       ...valid.map((v, i) => (v ? "valid" : att[i] ? "attended" : "absent"))]);

@@ -64,7 +64,7 @@ Only one session can be live at a time, each session can be started once, and yo
 - 10 tokens per student per session, given by the contract when they check in (once per address per session).
 - Votes for a team = √(tokens given to it), with at most 10 tokens per team. Voting for your own team is blocked.
 - Students can't send tokens to each other. Tokens can only be spent as votes.
-- Valid ballot = checked in + tokens on every presenting team except your own + at least 2 written questions.
+- Valid ballot (computed by the site) = checked in + at least 1 token sent, to any teams + at least 2 written questions. The contract's own `ballotValid` is stricter (tokens on every team) and is not used for grading.
 - Unspent tokens expire the moment you end the session.
 
 ## Grades and feedback (Admin → Exports)
